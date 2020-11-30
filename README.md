@@ -1,99 +1,140 @@
-# Using the ODBC Interface of SAP HANA
+# Linux ODBC Setup for SAP HANA
 
-The ODBC standard (Open Database Connectivity) defines a SQL-interface to database systems in order to provide
+The ODBC standard (Open Database Connectivity) defines an SQL-interface to database systems in order to provide
 application developers with a unified and stable communication channel to different backends. Many programming languages
 provide ODBC client libraries which allow to develop the client application using the languages and frameworks most
-suitable to the task at hand.
+suitable to the task at hand. In order to use an ODBC client database-specific drivers are required.
 
-In order to use an ODBC client database-specific drivers are required.
+This guide assumes that valid login credentials to an SAP HANA database instance are available. The configuration herein will
+use the following credentials:
 
-### Linux-specific Setup (Ubuntu 19.10)
+| Key      |               |
+| ---      | ---           |
+| Host     | zion          |
+| Port     | 30015         |
+| Database | NEB           |
+| User     | TANDERSON     |
+| Password | WhiteRabbit99 |
 
-Install the [SAP Hana Tools](https://tools.hana.ondemand.com/#hanatools) suite which, among other things, contains the
-database-specific ODBC driver in a file named `libodbcHDB.so`. Afterwards, install the unixODBC package:
+
+## 1. Installation
+
+Install, preferably from source, the [unixODBC](http://www.unixodbc.org/) package containing
++ the Linux ODBC libraries
++ `iusql`, an interactive SQL shell for ODBC connections
++ `odbcinst`, an ODBC configuration tool
+
+Install the [SAP Hana Tools](https://tools.hana.ondemand.com/#hanatools) suite which encompasses
++ `libodbcHDB.so`, the database-specific ODBC driver
++ `hdbuserstore`, a tool to encrypt and store locally your HANA user credentials and connection details
++ `hdbsql`, an interactive HANA SQL shell
+
+
+## 2. Configuration
+
+### 2.1 Configure login credentials via `hdbuserstore`
+
+Using `hdbuserstore` generate an encrypted entry in your local list of HANA credentials using your available login details.
 
 ```sh
-## Using APT ..
-sudo apt install unixodbc
-sudo apt install unixodbc-dev odbcinst # these may be optional
-
-# .. or, better, install the most recent version from source
-# found at unixodbc.org. Dont' forget `./configure --sysconfig=/etc/`
+hsbuserstore set NEB_TANDERSON_DEV zion:30015@NEB TANDERSON WhiteRabbit99
 ```
 
-As stated in `man unixodbc` ODBC connections are managed in central configuration files, namely `/etc/odbc.ini` and
-`$HOME/.odbc.ini`. Edit one of these files to contain the connection information like so:
+Display all entries via `hdbuserstore list` and by launching an SQL shell ensure that henceforth you may connect to your
+database using the stored credentials.
+
+```sh
+hdbsql -U NEB_TANDERSON_DEV
+```
+
+### 2.2 Locate ODBC configuration files
+
+Depending on the unixODBC installation method the location of the configuration files may differ. Run `obdcinst -j` to
+display your particular setup and should your paths differ from those used herein adjust them correspondingly.
+
+```
+unixODBC 2.3.10pre
+DRIVERS............: /usr/local/etc/odbcinst.ini
+SYSTEM DATA SOURCES: /usr/local/etc/odbc.ini
+FILE DATA SOURCES..: /usr/local/etc/ODBCDataSources
+USER DATA SOURCES..: /home/neo/.odbc.ini
+SQLULEN Size.......: 8
+SQLLEN Size........: 8
+SQLSETPOSIROW Size.: 8
+```
+
+### 2.3 Register the SAP HANA driver
+
+Locate your `libodbcHDB.so` and create an entry in the database-specific drivers configuration file
+**/usr/local/etc/odbcinst.ini** like so:
 
 ```ini
-[hana_petet]
-
-Driver=/home/stan/bin/sap/hdbclient/libodbcHDB.so
-ServerNode=petet:30015
+[SAP HANA]
+Driver=/home/neo/bin/sap/hdbclient/libodbcHDB.so
 ```
 
-The section title *hana_petet* will be used later to refer to the connection defined following it. The *driver* field
-shall contain the absolute path of the HANA ODBC driver file mentioned above and depends on where the SAP HANA Tools were
-installed to. The *ServerNode* field shall contain the database's hostname and port.
+This file contains information about the location of the database-specific ODBC drivers on your system and will
+preference one file per database architecture you intend to communication with via ODBC. Note that the driver path must
+be absolute.
 
-Note that this is the minimal configuration required to use ODBC. More configuration options are listed in the official
-documentation or [here](https://db.rstudio.com/best-practices/drivers/) or
-[here](https://help.sap.com/viewer/0eec0d68141541d1b07893a39944924e/2.0.03/en-US/66a4169b84b2466892e1af9781049836.html).
 
-#### Associate an ODBC DSN with credentials set up via `hdbuserstore`
+### 2.4 Register the data source
 
-`hdbuserstore` may be used to store one's credentials locally (encrypted) and to refer to them via a label.
-`hdbuserstore SET PETET_JHN petet:30015@JHN PFISCHER MyPassword` will set up a record under the label of `PETET_JHN`
-referring to its respective credentials. Henceforth any connection may be established via the label, e.g.
-`hdbsql -U PETET_JHN ...` is equivalent to the verbose `hdbsql -u PFISCHER -p MyPassword -n petet:30015 -d JHN ...`.
-
-In order to associate an ODBC DSN entry in `/etc/odbc.ini` with a label referecing credentials set up with
-`hdbuserstore` one needs to prefix the label with an '@' and declare it the value to the *SERVERNODE* parameter of a
-DSN section. Using the above example `PETET_JHN`:
+The files **/usr/local/etc/odbc.ini** and **/home/neo/.odbc.ini** store ODBC connection information used to connect to
+databases which support ODBC and for which a driver has been made available. If you intend to make an ODBC connection
+available to every user on a system modify the former file, for per-user connection management use the latter. Generate
+an entry like so:
 
 ```ini
-[JHN_SECURE]
-
-Driver=/home/stan/bin/sap/hdbclient/libodbcHDB.so
-ServerNode=@PETET_JHN
+[HANA_ZION_NEB_TANDERSON]
+DRIVER=SAP HANA
+SERVERNODE=@NEB_TANDERSON_DEV
 ```
 
-This allows every application using ODBC to connect to the database using the stored credentials without the need to
-explicitly put one's password into source code.
+In order to establish communication the connection references the ODBC driver in its *DRIVER* field and the login
+credentials set via `hdbuserstore` in its *SERVERNODE* field. Note that the value is prefaced by a '@' indicating that
+value is a reference.
 
-**Troubleshooting** 
+## 2.5 Test & Troubleshooting
 
-+ Check the availability of the data base and correctness of the credentials via `hdbsql`.
-+ Check the odbc-connectivity via `iusql -v <DSN> <USER> <PWD>`.
-  + In case of the error *Data source name not found ...* it may be the case that unixODBC searches the
-    /usr/local/etc/ directory for the .ini files, in contrast to what's stated in its manual. Check via
-    `odbcinst -j`. This may be corrected at compile time using `./configure --sysconfig=/etc/` as explained
-    [here](http://www.unixodbc.org/download.html).
+Check if your SAP HANA credentials are valid, your encrypted user crendentials are functioning and the database is
+responsive:
 
-### Usage examples
+```sh
+hdbsql -n zion:30015 -d NEB -u TANDERSON -p WhiteRabbit99
+hdbsql -U NEB_TANDERSON_DEV
+```
+
+Check the ODBC connection using unixODBC's SQL `iusql -v HANA_ZION_NEB_TANDERSON`. Should this fail create two symlinks
+```
+/etc/odbc.ini -> /usr/local/etc/odbc.ini
+/etc/odbcinst.ini -> /usr/local/etc/ocbcinst.ini
+```
+which will work around a bug in unixODBC which exists at the time of writing (2020/11/29) and causes unixODBC to search
+for the ini-files under /etc/ instead of the custom directory configured prior to compilation via the --sysconfdir
+parameter (the author has been informed). Creating the above symlink will fix all problems related to this bug.
+
+## 3. Usage
 
 Given a properly configured setup the ODBC interface may be used from any application or programming language that
-provides a ODBC client implementation. The simplest way to check whether everything is set up correctly is to use the
-unixODBC command-line `iusql`. Given the above configuration `iusql hana_petet <USER> <PASSWORD>` will establish a
-connection and open an interactive SQL shell which may execute any SQL query, e.g. `SELECT 'FOO' from dummy;`.
+provides an ODBC client implementation. The simplest way to check whether everything is set up correctly is to use the
+unixODBC command-line `iusql` as shown above which establishes a connection and will open an interactive SQL shell which
+may execute any SQL query, e.g. `SELECT 'FOO' from dummy;`.
 
-As stated above, many programming languages provide ODBC client libraries which implicitly make use of the same ODBC
-configuration above. Here's an exemple for R.
+Additionally, many programming languages provide ODBC client libraries which implicitly make use of the same ODBC
+configuration above.
+
+### 3.1 R Examples
 
 ```R
 library(odbc)
 
-# Establish connection. Note that the DSN field (data source name) refers to the
-# system's ODBC configuration in the 'odbc.ini' file(s) mentioned above.
-con <- dbConnect(odbc(),
-                 DSN="hana_petet",
-                 UID="PFISCHER",
-                 PWD="MyPassword")
-
-# Alternatively, establish the same connection using the stored credentials
-# con <- dbConnect(odbc(), DSN="JHN_SECURE")
+# Establish connection. The DSN field (data source name) references to your
+# ODBC configuration in the 'odbc.ini' file(s).
+con <- dbConnect(odbc(), DSN="HANA_ZION_NEB_TANDERSON")
 
 # Send a statement or query
-res <- dbSendStatement(con, "CALL procfoo")
+res <- dbSendStatement(con, "SELECT 'Hello World!' FROM dummy;")
 
 # Pull a few rows from the query
 data <- dbFetch(res, n=10)
@@ -106,22 +147,17 @@ dbClearResult(res)
 dbDisconnect(con)
 ```
 
-### Arbitrary Statements and Limitations to ODBC
-
-The scope of ODBC is limited and does not support arbitrary constructs [TODO: Is that true? What's the true extent of
-ODBC?]. Some clients support dispatching arbitrary statements without semantic guarantees or limitations, however.
-
-In order to use `iusql` to dispatch HANA SQL-Script as if using SAP's `hdbsql` empty lines have to be removed from the
-SQL-file (e.g. `grep -v '^\s*$' | iusql -b`). An exemplary usage is provided in `man iusql`.
-
-# SAP HANA R Client API for Machine Learning
-
-Based on the previous setup one may develop machine learning applications using Python or R clients for SAP HANA. The
-SAP HANA Client tools contain the R package `hana.ml.r` in an archive named 'hdbclient/hana.ml.r_2.5.20062600.tar.gz'
-which can be installed locally via
-`install.packages("hdbclient/hana.ml.r_2.5.20062600.tar.gz", repos = NULL, type = "source")`.
+Based on the previous setup one may develop machine learning applications using Python or R clients for SAP HANA's
+Predictive Analysis Library (PAL). The SAP HANA Client tools contain the R package `hana.ml.r` in an archive named
+'hdbclient/hana.ml.r_2.5.20062600.tar.gz' (or similar) which can be installed locally via
+`install.packages("hdbclient/hana.ml.r_2.5.20062600.tar.gz", repos = NULL, type = "source")`. The package can be used
+using the above ODBC connection setup.
 
 ```R
-# Establish a connection using saved credentials
-con  <- hanaml.ConnectionContext(dsn = 'JHN_SECURE', username = '', password = '')
+library(hana.ml.r)
+
+# Establish a connection using saved credentials. Empty username and password fields are mandatory
+con <- hanaml.ConnectionContext(dsn="HANA_ZION_NEB_TANDERSON", username="", password="")
+
+# ...
 ```
