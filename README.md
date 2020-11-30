@@ -5,8 +5,8 @@ application developers with a unified and stable communication channel to differ
 provide ODBC client libraries which allow to develop the client application using the languages and frameworks most
 suitable to the task at hand. In order to use an ODBC client database-specific drivers are required.
 
-This guide assumes that valid login credentials to an SAP HANA database instance are available. The configuration herein will
-use the following credentials:
+This guide assumes that valid login credentials to an SAP HANA database instance are available. The configuration herein
+will use the following credentials:
 
 | Key      |               |
 | ---      | ---           |
@@ -34,7 +34,8 @@ Install the [SAP Hana Tools](https://tools.hana.ondemand.com/#hanatools) suite w
 
 ### 2.1 Configure login credentials via `hdbuserstore`
 
-Using `hdbuserstore` generate an encrypted entry in your local list of HANA credentials using your available login details.
+Using `hdbuserstore` generate an encrypted entry in your local list of HANA credentials using your available login
+details.
 
 ```sh
 hsbuserstore set NEB_TANDERSON_DEV zion:30015@NEB TANDERSON WhiteRabbit99
@@ -74,7 +75,7 @@ Driver=/home/neo/bin/sap/hdbclient/libodbcHDB.so
 ```
 
 This file contains information about the location of the database-specific ODBC drivers on your system and will
-preference one file per database architecture you intend to communication with via ODBC. Note that the driver path must
+reference one file per database architecture you intend to communication with via ODBC. Note that the driver path must
 be absolute.
 
 
@@ -93,11 +94,12 @@ SERVERNODE=@NEB_TANDERSON_DEV
 
 In order to establish communication the connection references the ODBC driver in its *DRIVER* field and the login
 credentials set via `hdbuserstore` in its *SERVERNODE* field. Note that the value is prefaced by a '@' indicating that
-value is a reference.
+this value is a reference. The label *HANA_ZION_NEB_TANDERSON* under which the configuration is stored is referred to
+as the *Data Source Name (DSN)*.
 
 ## 2.5 Test & Troubleshooting
 
-Check if your SAP HANA credentials are valid, your encrypted user crendentials are functioning and the database is
+Check if your SAP HANA credentials are valid, your encrypted user credentials are functioning and the database is
 responsive:
 
 ```sh
@@ -112,17 +114,17 @@ Check the ODBC connection using unixODBC's SQL `iusql -v HANA_ZION_NEB_TANDERSON
 ```
 which will work around a bug in unixODBC which exists at the time of writing (2020/11/29) and causes unixODBC to search
 for the ini-files under /etc/ instead of the custom directory configured prior to compilation via the --sysconfdir
-parameter (the author has been informed). Creating the above symlink will fix all problems related to this bug.
+parameter (the author has been informed). Creating the above symlinks will fix all problems related to this bug.
 
 ## 3. Usage
 
 Given a properly configured setup the ODBC interface may be used from any application or programming language that
 provides an ODBC client implementation. The simplest way to check whether everything is set up correctly is to use the
-unixODBC command-line `iusql` as shown above which establishes a connection and will open an interactive SQL shell which
-may execute any SQL query, e.g. `SELECT 'FOO' from dummy;`.
+unixODBC command-line `iusql` as shown above which establishes a connection and will open an interactive SQL shell to
+execute SQL queries.
 
-Additionally, many programming languages provide ODBC client libraries which implicitly make use of the same ODBC
-configuration above.
+Additionally, many programming languages provide ODBC client libraries which implicitly make use of the same underlying
+ODBC configuration.
 
 ### 3.1 R Examples
 
