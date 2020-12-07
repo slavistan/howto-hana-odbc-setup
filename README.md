@@ -112,9 +112,10 @@ Check the ODBC connection using unixODBC's SQL `iusql -v HANA_ZION_NEB_TANDERSON
 /etc/odbc.ini -> /usr/local/etc/odbc.ini
 /etc/odbcinst.ini -> /usr/local/etc/ocbcinst.ini
 ```
-which will work around a bug in unixODBC which exists at the time of writing (2020/11/29) and causes unixODBC to search
-for the ini-files under /etc/ instead of the custom directory configured prior to compilation via the --sysconfdir
-parameter (the author has been informed). Creating the above symlinks will fix all problems related to this bug.
+which will work around a bug in the SAP HANA ODBC drivers which exists at the time of writing (2020/11/29) and searches
+for the ini-files under */etc/* instead of the custom directory configured prior to compilation via the *--sysconfdir*
+parameter. Creating the above symlinks will fix all problems related to this bug. Alternatively, the environment
+variable *ODBCINI* can be set to the full path of the *odbc.ini* file.
 
 ## 3. Usage
 
