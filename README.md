@@ -97,7 +97,7 @@ credentials set via `hdbuserstore` in its *SERVERNODE* field. Note that the valu
 this value is a reference. The label *HANA_ZION_NEB_TANDERSON* under which the configuration is stored is referred to
 as the *Data Source Name (DSN)*.
 
-## 2.5 Test & Troubleshooting
+### 2.5 Test & Troubleshooting
 
 Check if your SAP HANA credentials are valid, your encrypted user credentials are functioning and the database is
 responsive:
